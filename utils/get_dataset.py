@@ -48,7 +48,6 @@ def generate_zip_id_sentence(ds, id_name, sentence_name, data_path):
 
 def get_dataset(
     dataset_name,
-    url_path,
     output_train_path,
     output_eval_path,
     csv_file_path,
@@ -99,22 +98,25 @@ if __name__ == "__main__":
         default="quocanh34/soict_train_dataset",
         help="Name of the dataset to download",
     )
+
     parser.add_argument(
-        "--url_path",
+        "--output_train_path",
         type=str,
-        default="https://drive.google.com/drive/folders/1FqCmmSjMMgkYjANXY7FD6tzqsfDwZJrY",
-        help="URL path to download the data",
-    )
-    parser.add_argument(
-        "--output_path",
-        type=str,
-        default="ASR-Wav2vec-Finetune/datasets",
+        default="../datasets/Train",
         help="Path to store the downloaded data",
     )
+
+    parser.add_argument(
+        "--output_eval_path",
+        type=str,
+        default="../datasets/Eval",
+        help="Path to store the downloaded data",
+    )
+
     parser.add_argument(
         "--csv_file_path",
         type=str,
-        default="ASR-Wav2vec-Finetune/datasets",
+        default="../datasets",
         help="Path to store the csv file",
     )
     parser.add_argument(
@@ -133,8 +135,8 @@ if __name__ == "__main__":
 
     get_dataset(
         args.dataset_name,
-        args.url_path,
-        args.output_path,
+        args.output_train_path,
+        args.output_eval_path,
         args.csv_file_path,
         args.id_name,
         args.sentence_name,
