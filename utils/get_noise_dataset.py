@@ -1,6 +1,7 @@
 import zipfile
 from utils.utils import runcmd
 import os
+import argparse
 
 
 def get_noise_dataset(url_path, output_path):
@@ -19,3 +20,23 @@ def get_noise_dataset(url_path, output_path):
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(output_path)
     os.remove(zip_path)
+
+
+if __name__ == "main":
+    parser = argparse.ArgumentParser(
+        description="Download and extract data from a given url"
+    )
+    parser.add_argument(
+        "--url_path",
+        type=str,
+        default="https://www.openslr.org/resources/28/rirs_noises.zip",
+        help="URL path to download data",
+    )
+    parser.add_argument(
+        "--output_path",
+        type=str,
+        default="ASR-Wav2vec-Finetune/noise_data",
+        help="Path to save data",
+    )
+    args = parser.parse_args()
+    get_noise_dataset(args.url_path, args.output_path)

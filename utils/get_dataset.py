@@ -3,6 +3,7 @@ import csv
 import zipfile
 import gdown
 import os
+import argparse
 
 
 def download_and_extract_data(url_path, output_path):
@@ -61,3 +62,55 @@ def get_dataset(
         dataset, id_name, sentence_name, output_path
     )
     generate_csv_from_dataset(test_zip_data, csv_test_file_path)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Download and extract data from a given url"
+    )
+    parser.add_argument(
+        "--dataset_name",
+        type=str,
+        default="quocanh34/soict_train_dataset",
+        help="Name of the dataset to download",
+    )
+    parser.add_argument(
+        "--url_path",
+        type=str,
+        default="https://drive.google.com/drive/folders/1FqCmmSjMMgkYjANXY7FD6tzqsfDwZJrY",
+        help="URL path to download the data",
+    )
+    parser.add_argument(
+        "--output_path",
+        type=str,
+        default="ASR-Wav2vec-Finetune/datasets",
+        help="Path to store the downloaded data",
+    )
+    parser.add_argument(
+        "--csv_file_path",
+        type=str,
+        default="ASR-Wav2vec-Finetune/datasets",
+        help="Path to store the csv file",
+    )
+    parser.add_argument(
+        "--id_name",
+        type=str,
+        default="id",
+        help="Name of the column containing the id",
+    )
+    parser.add_argument(
+        "--sentence_name",
+        type=str,
+        default="sentence_norm",
+        help="Name of the column containing the sentence",
+    )
+    args = parser.parse_args()
+
+    get_dataset(
+        args.dataset_name,
+        args.url_path,
+        args.output_path,
+        args.csv_file_path,
+        args.id_name,
+        args.sentence_name,
+    )
