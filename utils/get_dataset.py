@@ -4,15 +4,28 @@ import zipfile
 import gdown
 import os
 import argparse
+import soundfile as sf
+import numpy as np
 
 
-def download_and_extract_data(url_path, output_path):
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
+# def download_and_extract_data(url_path, output_path):
+#     if not os.path.exists(output_path):
+#         os.makedirs(output_path)
 
-    gdown.download(url_path, output_path, quiet=False)
-    with zipfile.ZipFile(output_path, "r") as zip_ref:
-        zip_ref.extractall(output_path.split(".")[0])
+#     gdown.download(url_path, output_path, quiet=False)
+#     with zipfile.ZipFile(output_path, "r") as zip_ref:
+#         zip_ref.extractall(output_path.split(".")[0])
+
+
+def save_wav_file(audio_array, file_name, save_path):
+    file_name = file_name + ".wav"
+    path = save_path + file_name
+    sampling_rate = 16000
+    data = np.asarray(audio_array)
+    sf.write(path, data, sampling_rate)
+    del data
+    del path
+    del file_name
 
 
 def generate_csv_from_dataset(zip_data, csv_file_path):
@@ -36,16 +49,28 @@ def generate_zip_id_sentence(ds, id_name, sentence_name, data_path):
 def get_dataset(
     dataset_name,
     url_path,
-    output_path,
+    output_train_path,
+    output_eval_path,
     csv_file_path,
     id_name="id",
     sentence_name="sentence_norm",
 ):
-    # Download and extract data
-    download_and_extract_data(url_path, output_path)
-
     # Load dataset
     dataset = load_dataset(dataset_name)
+
+    for i in range(len(dataset["train"])):
+        save_wav_file(
+            dataset["train"][i]["audio"]["array"],
+            dataset["train"][i]["id"],
+            output_train_path,
+        )
+
+    for i in range(len(dataset["test"])):
+        save_wav_file(
+            dataset["test"][i]["audio"]["array"],
+            dataset["test"][i]["id"],
+            output_eval_path,
+        )
 
     # Generate CSV file
     csv_train_file_path = "train.csv"
