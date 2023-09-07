@@ -133,7 +133,9 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
         ]
     )
 
-    default_collate = DefaultCollate(processor, config["meta"]["sr"], noise_transform, aug_transform)
+    default_collate = DefaultCollate(
+        processor, config["meta"]["sr"], noise_transform, aug_transform
+    )
 
     # Create train dataloader
     train_ds = train_base_ds.get_data()
@@ -166,11 +168,18 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
     )
 
     # Load pretrained model
-    model = SourceFileLoader("model", cached_path(hf_bucket_url(model_name,filename="model_handling.py"))).load_module().Wav2Vec2ForCTC.from_pretrained(
-        pretrained_path,
-        ctc_loss_reduction="mean",
-        pad_token_id=processor.tokenizer.pad_token_id,
-        # gradient_checkpointing=False
+    model = (
+        SourceFileLoader(
+            "model",
+            cached_path(hf_bucket_url(pretrained_path, filename="model_handling.py")),
+        )
+        .load_module()
+        .Wav2Vec2ForCTC.from_pretrained(
+            pretrained_path,
+            ctc_loss_reduction="mean",
+            pad_token_id=processor.tokenizer.pad_token_id,
+            # gradient_checkpointing=False
+        )
     )
 
     # freeze the wav2vec feature encoder, if you have small dataset, this helps a lot

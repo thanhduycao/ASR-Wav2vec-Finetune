@@ -5,6 +5,7 @@ import torch
 
 from utils.feature import load_wav
 from typing import Dict
+import random
 
 
 class DefaultCollate:
@@ -21,7 +22,9 @@ class DefaultCollate:
             feature = features[i]
             features[i] = self.noise_transform(features[i], sample_rate=self.sr)
             if (feature == features[i]).all():
-                features[i] = self.aug_transform(features[i], sample_rate=self.sr)
+                prob = random.random()
+                if prob > 0.5:
+                    features[i] = self.aug_transform(features[i], sample_rate=self.sr)
 
         batch = self.processor(
             features, sampling_rate=16000, padding="longest", return_tensors="pt"

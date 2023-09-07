@@ -7,6 +7,7 @@ import soundfile as sf
 import numpy as np
 from joblib import Parallel, delayed
 import multiprocessing as mp
+from tqdm import tqdm
 
 
 def save_wav_file(audio_array, file_name, save_path):
@@ -57,20 +58,35 @@ def get_dataset(
 
     num_jobs = mp.cpu_count()  # Adjust the number of parallel jobs as needed
 
-    Parallel(n_jobs=num_jobs)(
-        delayed(save_wav_file)(
-            dataset["train"][i]["audio"]["array"],
-            dataset["train"][i]["id"],
-            output_train_path,
+    with tqdm(total=len(dataset["train"])) as pbar:
+        Parallel(n_jobs=num_jobs)(
+            delayed(
+                lambda i: (
+                    save_wav_file(
+                        dataset["train"][i]["audio"]["array"],
+                        dataset["train"][i]["id"],
+                        output_train_path,
+                    ),
+                    pbar.update(1),
+                )
+            )(i)
+            for i in range(len(dataset["train"]))
         )
-    )
-    Parallel(n_jobs=num_jobs)(
-        delayed(save_wav_file)(
-            dataset["test"][i]["audio"]["array"],
-            dataset["test"][i]["id"],
-            output_eval_path,
+
+    with tqdm(total=len(dataset["test"])) as pbar:
+        Parallel(n_jobs=num_jobs)(
+            delayed(
+                lambda i: (
+                    save_wav_file(
+                        dataset["test"][i]["audio"]["array"],
+                        dataset["test"][i]["id"],
+                        output_train_path,
+                    ),
+                    pbar.update(1),
+                )
+            )(i)
+            for i in range(len(dataset["test"]))
         )
-    )
     # Generate CSV file
     csv_train_file_path = "train.csv"
     csv_train_file_path = os.path.join(csv_file_path, csv_train_file_path)

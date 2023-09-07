@@ -39,7 +39,7 @@ clone_from = "https://huggingface.co/thanhduycao/wav2vec2-large-finetune-aug-on-
 [train_dataset]
 path = "base.base_dataset.BaseDataset"
 [train_dataset.args]
-path = "/kaggle/working/ASR-Wav2vec-Finetune/datasets/train.csv"
+path = "datasets/train.csv"
 preload_data = false
 delimiter = "|"
 # Only train audio files that have duration in range [min_duration, max_duration]
@@ -61,7 +61,7 @@ drop_last = true
 [val_dataset]
 path = "base.base_dataset.BaseDataset"
 [val_dataset.args]
-path = "/kaggle/working/ASR-Wav2vec-Finetune/datasets/test.csv"
+path = "datasets/test.csv"
 preload_data = false
 delimiter = "|"
 nb_workers = 8
