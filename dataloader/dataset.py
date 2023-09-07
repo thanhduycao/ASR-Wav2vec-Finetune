@@ -12,6 +12,7 @@ class DefaultCollate:
         self.processor = processor
         self.sr = sr
         self.aug_transform = aug_transform
+        self.noise_transform = noise_transform
 
     def __call__(self, inputs) -> Dict[str, torch.tensor]:
         features, transcripts = zip(*inputs)

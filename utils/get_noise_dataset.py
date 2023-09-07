@@ -1,10 +1,13 @@
 import zipfile
-from utils.utils import runcmd
+from utils import runcmd
 import os
 import argparse
 
 
 def get_noise_dataset(url_path, output_path):
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
     runcmd(f"wget -P {output_path} {url_path}", verbose=True)
     # list to store files
     res = []
@@ -22,7 +25,7 @@ def get_noise_dataset(url_path, output_path):
     os.remove(zip_path)
 
 
-if __name__ == "main":
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Download and extract data from a given url"
     )
@@ -35,7 +38,7 @@ if __name__ == "main":
     parser.add_argument(
         "--output_path",
         type=str,
-        default="ASR-Wav2vec-Finetune/noise_data",
+        default="../noise_data",
         help="Path to save data",
     )
     args = parser.parse_args()

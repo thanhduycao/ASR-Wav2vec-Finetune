@@ -1,20 +1,12 @@
 from datasets import load_dataset
 import csv
 import zipfile
-import gdown
 import os
 import argparse
 import soundfile as sf
 import numpy as np
-
-
-# def download_and_extract_data(url_path, output_path):
-#     if not os.path.exists(output_path):
-#         os.makedirs(output_path)
-
-#     gdown.download(url_path, output_path, quiet=False)
-#     with zipfile.ZipFile(output_path, "r") as zip_ref:
-#         zip_ref.extractall(output_path.split(".")[0])
+from joblib import Parallel, delayed
+import multiprocessing as mp
 
 
 def save_wav_file(audio_array, file_name, save_path):
@@ -33,12 +25,12 @@ def generate_csv_from_dataset(zip_data, csv_file_path):
     with open(csv_file_path, "w", newline="", encoding="utf-8") as csv_file:
         csv_writer = csv.writer(csv_file, delimiter="|")
         csv_writer.writerow(["path", "transcript"])  # Write header
-        csv_writer.writerows(data)
+        csv_writer.writerows(zip_data)
 
 
 def generate_zip_id_sentence(ds, id_name, sentence_name, data_path):
-    ids = ds["train"][id_name]
-    sentences = ds["train"][sentence_name]
+    ids = ds[id_name]
+    sentences = ds[sentence_name]
 
     for i in range(len(ids)):
         ids[i] = data_path + ids[i] + ".wav"
@@ -57,33 +49,46 @@ def get_dataset(
     # Load dataset
     dataset = load_dataset(dataset_name)
 
-    for i in range(len(dataset["train"])):
-        save_wav_file(
+    if not os.path.exists(output_train_path):
+        os.makedirs(output_train_path)
+
+    if not os.path.exists(output_eval_path):
+        os.makedirs(output_eval_path)
+
+    num_jobs = mp.cpu_count()  # Adjust the number of parallel jobs as needed
+
+    Parallel(n_jobs=num_jobs)(
+        delayed(save_wav_file)(
             dataset["train"][i]["audio"]["array"],
             dataset["train"][i]["id"],
             output_train_path,
         )
-
-    for i in range(len(dataset["test"])):
-        save_wav_file(
+    )
+    Parallel(n_jobs=num_jobs)(
+        delayed(save_wav_file)(
             dataset["test"][i]["audio"]["array"],
             dataset["test"][i]["id"],
             output_eval_path,
         )
-
+    )
     # Generate CSV file
     csv_train_file_path = "train.csv"
     csv_train_file_path = os.path.join(csv_file_path, csv_train_file_path)
     csv_test_file_path = "test.csv"
     csv_test_file_path = os.path.join(csv_file_path, csv_test_file_path)
 
+    current_directory = os.getcwd()
+
+    output_train_data = os.path.join(current_directory, output_train_path)
+
     train_zip_data = generate_zip_id_sentence(
-        dataset, id_name, sentence_name, output_path
+        dataset["train"], id_name, sentence_name, output_train_data
     )
     generate_csv_from_dataset(train_zip_data, csv_train_file_path)
 
+    output_test_data = os.path.join(current_directory, output_eval_path)
     test_zip_data = generate_zip_id_sentence(
-        dataset, id_name, sentence_name, output_path
+        dataset["test"], id_name, sentence_name, output_test_data
     )
     generate_csv_from_dataset(test_zip_data, csv_test_file_path)
 
@@ -102,21 +107,21 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output_train_path",
         type=str,
-        default="../datasets/Train",
+        default="../datasets/Train/",
         help="Path to store the downloaded data",
     )
 
     parser.add_argument(
         "--output_eval_path",
         type=str,
-        default="../datasets/Eval",
+        default="../datasets/Eval/",
         help="Path to store the downloaded data",
     )
 
     parser.add_argument(
         "--csv_file_path",
         type=str,
-        default="../datasets",
+        default="../datasets/",
         help="Path to store the csv file",
     )
     parser.add_argument(
