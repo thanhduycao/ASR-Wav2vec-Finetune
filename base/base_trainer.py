@@ -11,26 +11,27 @@ from huggingface_hub import Repository
 
 class BaseTrainer:
     def __init__(
-                    self, 
-                    dist, 
-                    rank, 
-                    config, 
-                    resume, 
-                    preload, 
-                    epochs, 
-                    steps_per_epoch,
-                    model, 
-                    processor,
-                    train_dl,
-                    val_dl,
-                    train_sampler,
-                    val_sampler,
-                    optimizer, 
-                    scheduler, 
-                    save_dir, 
-                    log_dir,
-                    use_amp,
-                    gradient_accumulation_steps):
+        self,
+        dist,
+        rank,
+        config,
+        resume,
+        preload,
+        epochs,
+        steps_per_epoch,
+        model,
+        processor,
+        train_dl,
+        val_dl,
+        train_sampler,
+        val_sampler,
+        optimizer,
+        scheduler,
+        save_dir,
+        log_dir,
+        use_amp,
+        gradient_accumulation_steps,
+    ):
         self.dist = dist
         self.rank = rank
         self.config = config
@@ -56,7 +57,7 @@ class BaseTrainer:
         self.scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
         self.completed_steps = 0
         self.resume_step = -1
-        
+
         self.validation_interval = config["trainer"]["args"]["validation_interval"]
         self.save_max_metric_score = config["trainer"]["args"]["save_max_metric_score"]
         self.best_score = -np.inf if self.save_max_metric_score else np.inf
@@ -66,7 +67,7 @@ class BaseTrainer:
             if self.config["huggingface"]["overwrite_output_dir"]:
                 shutil.rmtree(config["huggingface"]["args"]["local_dir"])
             self.repo = Repository(**self.config["huggingface"]["args"])
-            
+
         # save processor
         self.processor.save_pretrained(config["huggingface"]["args"]["local_dir"])
 
@@ -81,15 +82,20 @@ class BaseTrainer:
             self._count_trainable_parameters()
 
     def _count_trainable_parameters(self) -> None:
-        print("Number of trainable params: ", sum(p.numel() for p in self.model.parameters() if p.requires_grad)/1e6)
+        print(
+            "Number of trainable params: ",
+            sum(p.numel() for p in self.model.parameters() if p.requires_grad) / 1e6,
+        )
 
     def _count_parameters(self) -> None:
         params_of_network = 0
         for param in self.model.parameters():
             params_of_network += param.numel()
-        print(f"The amount of parameters in the project is {params_of_network / 1e6} million.")
+        print(
+            f"The amount of parameters in the project is {params_of_network / 1e6} million."
+        )
 
-    def _push_to_hub(self, commit_message : str = "End of training") -> None:
+    def _push_to_hub(self, commit_message: str = "End of training") -> None:
         """
         Read https://huggingface.co/docs/hub/how-to-upstream#repository
         Args:
@@ -98,11 +104,11 @@ class BaseTrainer:
 
         self.repo.git_pull()
         return_message = self.repo.push_to_hub(
-            commit_message=commit_message, blocking=self.config["huggingface"]["blocking"], auto_lfs_prune=True
+            commit_message=commit_message,
+            blocking=self.config["huggingface"]["blocking"],
+            auto_lfs_prune=True,
         )
         print(f"*****{return_message}*****")
-
-            
 
     def _preload_model(self, model_path) -> None:
         """
@@ -110,14 +116,16 @@ class BaseTrainer:
         Args:
             model_path: The file path of the *.tar file
         """
-        assert os.path.exists(model_path), f"The file {model_path} is not exist. please check path."
+        assert os.path.exists(
+            model_path
+        ), f"The file {model_path} is not exist. please check path."
 
-        map_location = {'cuda:%d' % 0: 'cuda:%d' % self.rank}
+        map_location = {"cuda:%d" % 0: "cuda:%d" % self.rank}
         checkpoint = torch.load(model_path, map_location=map_location)
         if isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
-            self.model.module.load_state_dict(checkpoint["model"], strict = False)
+            self.model.module.load_state_dict(checkpoint["model"], strict=False)
         else:
-            self.model.load_state_dict(checkpoint["model"], strict = False)
+            self.model.load_state_dict(checkpoint["model"], strict=False)
 
         if self.rank == 0:
             print(f"Model preloaded successfully from {model_path}.")
@@ -128,13 +136,15 @@ class BaseTrainer:
         """
         latest_model_path = os.path.join(self.save_dir, "latest_model.tar")
         print("Loading model from ", latest_model_path)
-        assert os.path.exists(latest_model_path), f"{latest_model_path} does not exist, can not load latest checkpoint."
+        assert os.path.exists(
+            latest_model_path
+        ), f"{latest_model_path} does not exist, can not load latest checkpoint."
 
-        map_location = {'cuda:%d' % 0: 'cuda:%d' % self.rank}
+        map_location = {"cuda:%d" % 0: "cuda:%d" % self.rank}
         checkpoint = torch.load(latest_model_path, map_location=map_location)
-        
+
         self.start_epoch = checkpoint["epoch"]
-        self.resume_step = checkpoint["dl_step"] 
+        self.resume_step = checkpoint["dl_step"]
         self.completed_steps = checkpoint["completed_steps"] + 1
         self.pbar_step = checkpoint["pbar_step"] + 1
         self.best_score = checkpoint["best_score"]
@@ -142,9 +152,9 @@ class BaseTrainer:
         self.scheduler.load_state_dict(checkpoint["scheduler"])
         self.scaler.load_state_dict(checkpoint["scaler"])
         if isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
-            self.model.module.load_state_dict(checkpoint["model"], strict = True)
+            self.model.module.load_state_dict(checkpoint["model"], strict=True)
         else:
-            self.model.load_state_dict(checkpoint["model"], strict = True)
+            self.model.load_state_dict(checkpoint["model"], strict=True)
         self.scaler.load_state_dict(checkpoint["scaler"])
 
         if self.resume_step == len(self.train_dl) - 1:
@@ -153,11 +163,16 @@ class BaseTrainer:
             self.pbar_step = 0
 
         if self.rank == 0:
-            print("*****Note that any changes in your config file or your training dataset may cause the resume to run incorrectly*****")
-            print(f"Start training at step {self.pbar_step+1} in epoch {self.start_epoch+1} (= {self.completed_steps+1} iterations) based on your configuration and training dataset")
+            print(
+                "*****Note that any changes in your config file or your training dataset may cause the resume to run incorrectly*****"
+            )
+            print(
+                f"Start training at step {self.pbar_step+1} in epoch {self.start_epoch+1} (= {self.completed_steps+1} iterations) based on your configuration and training dataset"
+            )
 
-
-    def _save_checkpoint(self, epoch: int, dl_step: int, is_best_epoch: bool = False) -> None:
+    def _save_checkpoint(
+        self, epoch: int, dl_step: int, is_best_epoch: bool = False
+    ) -> None:
         """
         Save checkpoint to "<save_dir>" directory, which consists of:
         Args:
@@ -175,7 +190,7 @@ class BaseTrainer:
             "optimizer": self.optimizer.state_dict(),
             "scaler": self.scaler.state_dict(),
             "scheduler": self.scheduler.state_dict(),
-            "completed_steps": self.completed_steps
+            "completed_steps": self.completed_steps,
         }
 
         if isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
@@ -190,7 +205,7 @@ class BaseTrainer:
 
         # "model_{epoch_number}.tar"
         # Contains all checkpoint information, like "latest_model.tar". However, the newer information will no overwrite the older one.
-        torch.save(state_dict, os.path.join(self.save_dir, f"model_{str(self.completed_steps+1)}.tar"))
+        # torch.save(state_dict, os.path.join(self.save_dir, f"model_{str(self.completed_steps+1)}.tar"))
 
         # If the model get a best metric score (is_best_epoch=True) in the current epoch,
         # the model checkpoint will be saved as "best_model.tar."
@@ -198,13 +213,21 @@ class BaseTrainer:
         if is_best_epoch:
             torch.save(state_dict, os.path.join(self.save_dir, "best_model.tar"))
             if isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
-                self.model.module.save_pretrained(self.config["huggingface"]["args"]["local_dir"])
+                self.model.module.save_pretrained(
+                    self.config["huggingface"]["args"]["local_dir"]
+                )
+                self.model.module.push_to_hub(
+                    self.config["huggingface"]["args"]["local_dir"],
+                    commit_message=f"Save step {dl_step}",
+                )
             else:
-                self.model.save_pretrained(self.config["huggingface"]["args"]["local_dir"])
-            
-            if self.config["huggingface"]["push_to_hub"] and self.config["huggingface"]["push_every_validation_step"]:
-                self._push_to_hub("update_best_model", True)
-
+                self.model.save_pretrained(
+                    self.config["huggingface"]["args"]["local_dir"]
+                )
+                self.model.push_to_hub(
+                    self.config["huggingface"]["args"]["local_dir"],
+                    commit_message=f"Save step {dl_step}",
+                )
 
     def _is_best_epoch(self, score, save_max_metric_score=True) -> bool:
         """
@@ -218,21 +241,14 @@ class BaseTrainer:
             return True
         else:
             return False
-        
 
     def train(self) -> None:
         for epoch in range(self.start_epoch, self.epochs):
             self.model.train()
             self._train_epoch(epoch)
 
-        if self.rank == 0 and self.config["huggingface"]["push_to_hub"] and not self.config["huggingface"]["push_every_validation_step"]:
-                self._push_to_hub("update_best_model", True)
-
-
     def _train_epoch(self, epoch) -> None:
         raise NotImplementedError
 
     def _valid_epoch(self, epoch) -> None:
         raise NotImplementedError
-
-   

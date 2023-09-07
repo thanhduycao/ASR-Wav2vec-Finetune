@@ -3,6 +3,8 @@ import torch
 import numpy as np
 import random
 import os
+import subprocess
+
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -11,7 +13,8 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+
 
 def initialize_module(path: str, args: dict = None, initialize: bool = True):
     module_path = ".".join(path.split(".")[:-1])
@@ -29,5 +32,11 @@ def initialize_module(path: str, args: dict = None, initialize: bool = True):
         return class_or_function
 
 
-
-
+def runcmd(cmd, verbose=False, *args, **kwargs):
+    process = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True
+    )
+    std_out, std_err = process.communicate()
+    if verbose:
+        print(std_out.strip(), std_err)
+    pass
