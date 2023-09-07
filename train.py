@@ -34,6 +34,8 @@ from audiomentations import (
     Shift,
 )
 import numpy as np
+from importlib.machinery import SourceFileLoader
+from transformers.file_utils import cached_path, hf_bucket_url
 
 
 def setup(rank, world_size):
@@ -164,7 +166,7 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
     )
 
     # Load pretrained model
-    model = Wav2Vec2ForCTC.from_pretrained(
+    model = SourceFileLoader("model", cached_path(hf_bucket_url(model_name,filename="model_handling.py"))).load_module().Wav2Vec2ForCTC.from_pretrained(
         pretrained_path,
         ctc_loss_reduction="mean",
         pad_token_id=processor.tokenizer.pad_token_id,
