@@ -31,7 +31,6 @@ from audiomentations import (
     AddGaussianNoise,
     TimeStretch,
     PitchShift,
-    Shift,
 )
 import numpy as np
 from importlib.machinery import SourceFileLoader
@@ -127,9 +126,10 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
     aug_transform = Compose(
         [
             AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.015, p=0.5),
-            TimeStretch(min_rate=0.8, max_rate=1.25, p=0.5),
+            TimeStretch(
+                min_rate=0.8, max_rate=1.2, leave_length_unchanged=False, p=0.5
+            ),
             PitchShift(min_semitones=-4, max_semitones=4, p=0.5),
-            Shift(p=0.5),
         ]
     )
 
