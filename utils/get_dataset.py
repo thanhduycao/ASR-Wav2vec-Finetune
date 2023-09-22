@@ -102,7 +102,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_name",
         type=str,
-        default="quocanh34/soict_train_dataset",
+        default="thanhduycao/data_soict_train_synthesis_entity",
         help="Name of the dataset to download",
     )
 

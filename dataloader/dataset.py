@@ -7,6 +7,8 @@ from utils.feature import load_wav
 from typing import Dict
 import random
 
+random.seed(42)
+
 from audiomentations import (
     Compose,
     AddGaussianNoise,
@@ -36,12 +38,19 @@ class DefaultCollate:
         features, transcripts = zip(*inputs)
         features, transcripts = list(features), list(transcripts)
         for i in range(len(features)):
-            feature = features[i]
-            features[i] = self.noise_transform(features[i], sample_rate=self.sr)
-            if (feature == features[i]).all():
-                prob = random.random()
-                duration = len(features[i]) / self.sr
-                if prob > 0.5:
+            prob = random.random()
+            if prob > 0.5:
+                feature = features[i]
+                features[i] = self.noise_transform(features[i], sample_rate=self.sr)
+                if (feature == features[i]).all():
+                    # prob = random.random()
+                    # duration = len(features[i]) / self.sr            
+                    # if prob > 0.5:
+                    #     if duration <= self.duration_threshold:
+                    #         features[i] = self.aug_transform(features[i], sample_rate=self.sr)
+                    #     else:
+                    #         features[i] = aug_transform_threshold(features[i], sample_rate=self.sr)
+                    duration = len(features[i]) / self.sr
                     if duration <= self.duration_threshold:
                         features[i] = self.aug_transform(features[i], sample_rate=self.sr)
                     else:

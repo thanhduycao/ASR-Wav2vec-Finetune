@@ -116,9 +116,8 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
 
     noise_transform = AddBackgroundNoise(
         sounds_path=noise_path,
-        noise_rms="absolute",
-        min_absolute_rms_in_db=-45.0,
-        max_absolute_rms_in_db=-15.0,
+        min_snr_in_db=3.0,
+        max_snr_in_db=30.0,
         noise_transform=PolarityInversion(),
         p=0.5,
     )
