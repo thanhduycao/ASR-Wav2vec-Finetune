@@ -28,9 +28,12 @@ from audiomentations import (
     AddBackgroundNoise,
     PolarityInversion,
     Compose,
+    OneOf,
     AddGaussianNoise,
     TimeStretch,
     PitchShift,
+    RoomSimulator,
+    Gain,
 )
 import numpy as np
 from importlib.machinery import SourceFileLoader
@@ -122,18 +125,55 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
         p=0.5,
     )
 
-    aug_transform = Compose(
+    # aug_transform = Compose(
+    #     [
+    #         AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.010, p=0.5),
+    #         TimeStretch(
+    #             min_rate=0.8, max_rate=1.1, leave_length_unchanged=False, p=0.5
+    #         ),
+    #         PitchShift(min_semitones=-4, max_semitones=4, p=0.5),
+    #     ]
+    # )
+
+    light_transform = Compose(
         [
-            AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.010, p=0.5),
-            TimeStretch(
-                min_rate=0.8, max_rate=1.1, leave_length_unchanged=False, p=0.5
-            ),
+            TimeStretch(min_rate=0.9, max_rate=1.1, leave_length_unchanged=False, p=0.25),
+            RoomSimulator(p=0.15),
+            OneOf([
+                AddBackgroundNoise(
+                    sounds_path=noise_path,
+                    min_snr_in_db=2.5,
+                    max_snr_in_db=15.0,
+                    noise_transform=PolarityInversion(),
+                    p=0.5,
+                ),
+                AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.010, p=0.5),
+            ], p=0.35),
+            Gain(min_gain_in_db=-6, max_gain_in_db=6, p=0.1),
+        ]
+    )
+
+    heavy_transform = Compose(
+        [
+            TimeStretch(min_rate=0.8, max_rate=2.0, leave_length_unchanged=False, p=0.5),
+            RoomSimulator(p=0.3),
+            OneOf([
+                AddBackgroundNoise(
+                    sounds_path=noise_path,
+                    min_snr_in_db=5.0,
+                    max_snr_in_db=30.0,
+                    noise_transform=PolarityInversion(),
+                    p=1.0,
+                ),
+                AddGaussianNoise(min_amplitude=0.005, max_amplitude=0.015, p=1.0),
+            ], p=0.7),
+            Gain(min_gain_in_db=-6, max_gain_in_db=6, p=0.2),
             PitchShift(min_semitones=-4, max_semitones=4, p=0.5),
         ]
     )
 
     default_collate = DefaultCollate(
-        processor, config["meta"]["sr"], noise_transform, aug_transform
+        processor, config["meta"]["sr"], light_transform, heavy_transform
     )
 
     # Create train dataloader
@@ -204,6 +244,7 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
     if rank == 0:
         print("Number of training utterances: ", len(train_ds))
         print("Number of validation utterances: ", len(val_ds))
+        print(train_ds[0])
 
     trainer_class = initialize_module(config["trainer"]["path"], initialize=False)
     trainer = trainer_class(

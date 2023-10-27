@@ -11,9 +11,11 @@ random.seed(42)
 
 from audiomentations import (
     Compose,
+    OneOf,
     AddGaussianNoise,
     TimeStretch,
     PitchShift,
+    RoomSimulator,
 )
 
 aug_transform_threshold = Compose(
@@ -27,34 +29,38 @@ aug_transform_threshold = Compose(
     )
 
 class DefaultCollate:
-    def __init__(self, processor, sr, noise_transform, aug_transform) -> None:
+    def __init__(self, processor, sr, light_transform, heavy_transform) -> None:
         self.processor = processor
         self.sr = sr
-        self.aug_transform = aug_transform
-        self.noise_transform = noise_transform
+        self.light_transform = light_transform
+        self.heavy_transform = heavy_transform
         self.duration_threshold = 8.0
 
     def __call__(self, inputs) -> Dict[str, torch.tensor]:
-        features, transcripts = zip(*inputs)
-        features, transcripts = list(features), list(transcripts)
+        features, transcripts, wer = zip(*inputs)
+        features, transcripts, wer = list(features), list(transcripts), list(wer)
         for i in range(len(features)):
-            prob = random.random()
-            if prob > 0.5:
-                feature = features[i]
-                features[i] = self.noise_transform(features[i], sample_rate=self.sr)
-                if (feature == features[i]).all():
-                    # prob = random.random()
-                    # duration = len(features[i]) / self.sr            
-                    # if prob > 0.5:
-                    #     if duration <= self.duration_threshold:
-                    #         features[i] = self.aug_transform(features[i], sample_rate=self.sr)
-                    #     else:
-                    #         features[i] = aug_transform_threshold(features[i], sample_rate=self.sr)
-                    duration = len(features[i]) / self.sr
-                    if duration <= self.duration_threshold:
-                        features[i] = self.aug_transform(features[i], sample_rate=self.sr)
-                    else:
-                        features[i] = aug_transform_threshold(features[i], sample_rate=self.sr)
+            # prob = random.random()
+            # if prob > 0.5:
+            #     feature = features[i]
+            #     features[i] = self.noise_transform(features[i], sample_rate=self.sr)
+            #     if (feature == features[i]).all():
+            #         # prob = random.random()
+            #         # duration = len(features[i]) / self.sr            
+            #         # if prob > 0.5:
+            #         #     if duration <= self.duration_threshold:
+            #         #         features[i] = self.aug_transform(features[i], sample_rate=self.sr)
+            #         #     else:
+            #         #         features[i] = aug_transform_threshold(features[i], sample_rate=self.sr)
+            #         duration = len(features[i]) / self.sr
+            #         if duration <= self.duration_threshold:
+            #             features[i] = self.aug_transform(features[i], sample_rate=self.sr)
+            #         else:
+            #             features[i] = aug_transform_threshold(features[i], sample_rate=self.sr)
+            if wer[i] >= 0 and wer[i] <= 30:
+                features[i] = self.light_transform(features[i], sample_rate=self.sr)
+            elif wer[i] == 0:
+                features[i] = self.heavy_transform(features[i], sample_rate=self.sr)
 
 
         batch = self.processor(
@@ -90,4 +96,4 @@ class Dataset:
         else:
             feature = item["wav"]
 
-        return feature, item["transcript"]
+        return feature, item["transcript"], item["wer"]
