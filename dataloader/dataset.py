@@ -75,7 +75,7 @@ class DefaultCollate:
             #             features[i] = self.aug_transform(features[i], sample_rate=self.sr)
             #         else:
             #             features[i] = aug_transform_threshold(features[i], sample_rate=self.sr)
-            if wer[i] >= 0 and wer[i] <= 30:
+            if wer[i] > 0 and wer[i] <= 30:
                 if (self.spec_aug == True):
                     prob = random.random()
                     if prob > 0.25:
