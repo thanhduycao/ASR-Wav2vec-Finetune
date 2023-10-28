@@ -6,6 +6,7 @@ import torch
 from utils.feature import load_wav
 from typing import Dict
 import random
+import librosa
 
 random.seed(42)
 
@@ -18,6 +19,8 @@ from audiomentations import (
     RoomSimulator,
 )
 
+from augspec import SpecAugment, MelSpectrogram
+
 aug_transform_threshold = Compose(
         [
             AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.010, p=0.5),
@@ -27,6 +30,19 @@ aug_transform_threshold = Compose(
             PitchShift(min_semitones=-4, max_semitones=4, p=0.5),
         ]
     )
+
+melspectrogram_parameters = {
+        "n_mels": 128,
+        "fmin": 20,
+        "fmax": 32000
+    }
+
+melspectrogram_inverse_parameters = {
+        "fmin": 20,
+        "fmax": 32000
+    }
+
+transform = MelSpectrogram(parameters=melspectrogram_parameters, p=1.0)
 
 class DefaultCollate:
     def __init__(self, processor, sr, light_transform, heavy_transform) -> None:
@@ -58,10 +74,26 @@ class DefaultCollate:
             #         else:
             #             features[i] = aug_transform_threshold(features[i], sample_rate=self.sr)
             if wer[i] >= 0 and wer[i] <= 30:
-                try:
-                    features[i] = self.light_transform(features[i], sample_rate=self.sr)
-                except:
-                    print("light transform error")
+                prob = random.random()
+                if prob > 0.5:
+                    try:
+                        features[i] = self.light_transform(features[i], sample_rate=self.sr)
+                    except:
+                        print("light transform error")
+                else:
+                    transform_aug = SpecAugment(freq_masking=0.05, time_masking=0.1, p=0.5)
+                    melspec, sr = transform(data=features[i])['data']
+                    data = melspec, sr
+                    specAug, sr = transform_aug(data=data)['data']
+                    # Convert mel spectrogram to linear scale spectrogram
+                    linear_spec = librosa.feature.inverse.mel_to_stft(specAug, **melspectrogram_inverse_parameters)
+                    
+                    n_iter = 32
+                    # Invert the spectrogram to waveform using Griffin-Lim
+                    audio = librosa.griffinlim(linear_spec, n_iter=n_iter)
+                    features[i] = audio
+
+
             elif wer[i] == 0:
                 try:
                     features[i] = self.heavy_transform(features[i], sample_rate=self.sr)

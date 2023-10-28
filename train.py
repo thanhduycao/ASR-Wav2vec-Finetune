@@ -38,6 +38,7 @@ from audiomentations import (
 import numpy as np
 from importlib.machinery import SourceFileLoader
 from transformers.file_utils import cached_path, hf_bucket_url
+from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
 
 
 def setup(rank, world_size):
@@ -72,6 +73,7 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
     log_dir = os.path.join(
         config["meta"]["save_dir"], config["meta"]["name"] + "/log_dir"
     )
+    is_val = config["meta"]["is_val"]
 
     if rank == 0:
         # Creatr dirs
@@ -191,20 +193,24 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
         collate_fn=default_collate
     )
 
-    # Create val dataloader
-    val_base_ds = initialize_module(
-        config["val_dataset"]["path"], args=config["val_dataset"]["args"]
-    )
-    val_ds = val_base_ds.get_data()
-    val_sampler = torch.utils.data.distributed.DistributedSampler(
-        val_ds, num_replicas=world_size, rank=rank, **config["val_dataset"]["sampler"]
-    )
-    val_dl = DataLoader(
-        dataset=val_ds,
-        **config["val_dataset"]["dataloader"],
-        sampler=val_sampler,
-        collate_fn=default_collate
-    )
+    if (is_val != "false"):
+        # Create val dataloader
+        val_base_ds = initialize_module(
+            config["val_dataset"]["path"], args=config["val_dataset"]["args"]
+        )
+        val_ds = val_base_ds.get_data()
+        val_sampler = torch.utils.data.distributed.DistributedSampler(
+            val_ds, num_replicas=world_size, rank=rank, **config["val_dataset"]["sampler"]
+        )
+        val_dl = DataLoader(
+            dataset=val_ds,
+            **config["val_dataset"]["dataloader"],
+            sampler=val_sampler,
+            collate_fn=default_collate
+        )
+    else:
+        val_dl = None
+        val_sampler = None
 
     # Load pretrained model
     model = (
@@ -234,16 +240,40 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
     steps_per_epoch = (len(train_dl) // gradient_accumulation_steps) + (
         len(train_dl) % gradient_accumulation_steps != 0
     )
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer,
-        max_lr=config["scheduler"]["max_lr"],
-        epochs=epochs,
-        steps_per_epoch=steps_per_epoch,
-    )
+    # scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    #     optimizer,
+    #     max_lr=config["scheduler"]["max_lr"],
+    #     epochs=epochs,
+    #     steps_per_epoch=steps_per_epoch,
+    # )
+
+    # # Define your learning rate schedule parameters
+    # cycle_lengths = [5, 3, 3]  # Number of epochs in each cycle
+    # peak_lrs = [4e-5, 3e-5, 2e-5]  # Peak learning rates for each cycle
+
+    # # Create the CosineAnnealingWarmRestarts scheduler
+    # num_cycles = len(cycle_lengths)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+    #     optimizer, T_0=cycle_lengths[0], T_mult=2
+    # )
+
+    # Initialize the scheduler
+    # T_0 = len(train_ds) * 5  # For the first cycle of 5 epochs
+    # T_mult = 1
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=T_mult)
+
+    scheduler = CosineAnnealingWarmupRestarts(optimizer,
+                                          first_cycle_steps=len(train_ds),
+                                          cycle_mult=1.0,
+                                          max_lr=config["scheduler"]["max_lr"],
+                                          min_lr=config["optimizer"]["lr"],
+                                          warmup_steps=len(train_ds)/20,
+                                          gamma=0.5)
 
     if rank == 0:
         print("Number of training utterances: ", len(train_ds))
-        print("Number of validation utterances: ", len(val_ds))
+        if (is_val != "false"):
+            print("Number of validation utterances: ", len(val_ds))
         print(train_ds[0])
 
     trainer_class = initialize_module(config["trainer"]["path"], initialize=False)
@@ -270,6 +300,7 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
         gradient_accumulation_steps=gradient_accumulation_steps,
         use_amp=use_amp,
         max_clip_grad_norm=max_clip_grad_norm,
+        is_val=is_val,
     )
     trainer.train()
 
