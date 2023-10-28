@@ -12,3 +12,6 @@ tqdm==4.64.0
 transformers==4.18.0
 jiwer
 audiomentations
+albumentations
+pyroomacoustics
+'git+https://github.com/katsura-jp/pytorch-cosine-annealing-with-warmup'
