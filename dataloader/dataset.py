@@ -58,9 +58,15 @@ class DefaultCollate:
             #         else:
             #             features[i] = aug_transform_threshold(features[i], sample_rate=self.sr)
             if wer[i] >= 0 and wer[i] <= 30:
-                features[i] = self.light_transform(features[i], sample_rate=self.sr)
+                try:
+                    features[i] = self.light_transform(features[i], sample_rate=self.sr)
+                except:
+                    print("light transform error")
             elif wer[i] == 0:
-                features[i] = self.heavy_transform(features[i], sample_rate=self.sr)
+                try:
+                    features[i] = self.heavy_transform(features[i], sample_rate=self.sr)
+                except:
+                    print("heavy transform error")
 
 
         batch = self.processor(
