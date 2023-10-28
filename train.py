@@ -58,7 +58,7 @@ def cleanup():
     dist.destroy_process_group()
 
 
-def main(rank, world_size, config, resume, preload, noise_path, pretrained_path):
+def main(rank, world_size, config, resume, preload, noise_path, pretrained_path, scheduler_type, spec_aug):
     os.environ["CUDA_VISIBLE_DEVICES"] = config["meta"]["device_ids"]
     os.environ["TORCH_DISTRIBUTED_DEBUG"] = "INFO"
     setup(rank, world_size)
@@ -175,7 +175,7 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
     )
 
     default_collate = DefaultCollate(
-        processor, config["meta"]["sr"], light_transform, heavy_transform
+        processor, config["meta"]["sr"], light_transform, heavy_transform, spec_aug
     )
 
     # Create train dataloader
@@ -240,12 +240,6 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
     steps_per_epoch = (len(train_dl) // gradient_accumulation_steps) + (
         len(train_dl) % gradient_accumulation_steps != 0
     )
-    # scheduler = torch.optim.lr_scheduler.OneCycleLR(
-    #     optimizer,
-    #     max_lr=config["scheduler"]["max_lr"],
-    #     epochs=epochs,
-    #     steps_per_epoch=steps_per_epoch,
-    # )
 
     # # Define your learning rate schedule parameters
     # cycle_lengths = [5, 3, 3]  # Number of epochs in each cycle
@@ -262,13 +256,22 @@ def main(rank, world_size, config, resume, preload, noise_path, pretrained_path)
     # T_mult = 1
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=T_mult)
 
-    scheduler = CosineAnnealingWarmupRestarts(optimizer,
-                                          first_cycle_steps=len(train_ds),
-                                          cycle_mult=1.0,
-                                          max_lr=config["scheduler"]["max_lr"],
-                                          min_lr=config["optimizer"]["lr"],
-                                          warmup_steps=len(train_ds)/20,
-                                          gamma=0.5)
+    if (scheduler_type == "cosine"):
+        scheduler = CosineAnnealingWarmupRestarts(optimizer,
+                                            first_cycle_steps=len(train_ds),
+                                            cycle_mult=1.0,
+                                            max_lr=config["scheduler"]["max_lr"],
+                                            min_lr=config["optimizer"]["lr"],
+                                            warmup_steps=len(train_ds)/20,
+                                            gamma=0.5)
+    else:
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=config["scheduler"]["max_lr"],
+            epochs=epochs,
+            steps_per_epoch=steps_per_epoch,
+        )
+
 
     if rank == 0:
         print("Number of training utterances: ", len(train_ds))
@@ -333,6 +336,11 @@ if __name__ == "__main__":
     )
     args.add_argument("--noise_path", default=None, type=str, help="Path to noise data")
 
+    args.add_argument("--scheduler_type", default=None, type=str, help="Scheduler type")
+
+    args.add_argument("--spec_aug", default=None, type=bool, help="Spec aug")
+
+
     args = args.parse_args()
     config = toml.load(args.config)
     n_gpus = len(config["meta"]["device_ids"].split(","))
@@ -346,6 +354,8 @@ if __name__ == "__main__":
             args.preload,
             args.noise_path,
             args.pretrained_path,
+            args.scheduler_type,
+            args.spec_aug,
         ),
         nprocs=n_gpus,
         join=True,

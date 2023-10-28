@@ -46,12 +46,13 @@ transform = MelSpectrogram(parameters=melspectrogram_parameters, p=1.0)
 transform_aug = SpecAugment(freq_masking=0.05, time_masking=0.1, p=0.5)
 
 class DefaultCollate:
-    def __init__(self, processor, sr, light_transform, heavy_transform) -> None:
+    def __init__(self, processor, sr, light_transform, heavy_transform, spec_aug) -> None:
         self.processor = processor
         self.sr = sr
         self.light_transform = light_transform
         self.heavy_transform = heavy_transform
         self.duration_threshold = 8.0
+        self.spec_aug = spec_aug
 
     def __call__(self, inputs) -> Dict[str, torch.tensor]:
         features, transcripts, wer = zip(*inputs)
@@ -75,8 +76,7 @@ class DefaultCollate:
             #         else:
             #             features[i] = aug_transform_threshold(features[i], sample_rate=self.sr)
             if wer[i] >= 0 and wer[i] <= 30:
-                is_spec_aug = True
-                if (is_spec_aug == True):
+                if (self.spec_aug == True):
                     prob = random.random()
                     if prob > 0.25:
                         try:
